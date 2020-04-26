@@ -1,0 +1,106 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<canvas id="canvas"></canvas>
+
+<script>
+
+    const socket = io();
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const spaceBg = new Image();
+    spaceBg.src = "https://abload.de/img/agariowhitebackgroundt2j4l.png";
+
+    const tank = new Image();
+    tank.src = "https://abload.de/img/self_tank13kxg.png";
+
+    const bullet = new Image();
+    bullet.src = "https://abload.de/img/bulletlckp3.png";
+
+
+    const keyMap = {};
+    onkeydown = onkeyup = function (e) {
+        keyMap[e.keyCode] = e.type === 'keydown';
+        if (keyMap[32] === true) {
+            socket.emit("shot");
+        }
+    }
+
+    onmousemove = function (e) {
+        const angle = ((Math.atan2(e.clientY - window.innerHeight / 2, e.clientX - window.innerWidth / 2) * 180 / Math.PI) + 360) % 360;
+        const speed = Math.sqrt(Math.pow((window.innerWidth / 2 - e.clientX), 2) + Math.pow((window.innerHeight / 2 - e.clientY), 2));
+        if (speed < 50) {
+            socket.emit("angle", 1000);
+        } else {
+            socket.emit("angle", angle);
+        }
+    }
+
+    socket.on('connect', () => {
+        const name = prompt("Please enter a nickname", "Harry Potter");
+        if (name != null) {
+            socket.emit("name", name);
+        }
+    });
+
+    socket.on('update', function (data) {
+        const update = JSON.parse(data);
+        let selfPlayer = update.players[update.currentUser.socketId];
+
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        console.log(spaceBg.height + " " + canvas.height)
+        ctx.drawImage(spaceBg, -selfPlayer.x-((spaceBg.width-canvas.width)/2), -selfPlayer.y-((spaceBg.height-canvas.height)/2));
+
+        drawGui(selfPlayer)
+
+        for (let key in update.players) {
+            var playerX = (update.players[key].x - selfPlayer.x) + (window.innerWidth / 2);
+            var playerY = (update.players[key].y - selfPlayer.y) + (window.innerHeight / 2);
+            drawPlayer(playerX, playerY, update.players[key].name, update.players[key].health, update.players[key].angle)
+        }
+
+
+        for (let key in update.shots) {
+            var shotX = (update.shots[key].x - selfPlayer.x) + (window.innerWidth / 2);
+            var shotY = (update.shots[key].y - selfPlayer.y) + (window.innerHeight / 2);
+            drawShot(shotX, shotY, update.shots[key].angle)
+        }
+        ctx.save();
+    });
+
+    function drawGui(selfPlayer) {
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "#FF0000";
+        ctx.fillText(selfPlayer.x.toFixed(0) + "," + selfPlayer.y.toFixed(0) , 50, 100);
+    }
+
+    function drawPlayer(x, y, name, health, degrees) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((degrees + 90 % 360) * Math.PI / 180);
+        ctx.drawImage(tank, -tank.width / 2, -tank.width / 2);
+        ctx.restore();
+        ctx.fillStyle = "#00FF00";
+        ctx.fillRect(x - tank.width, y - tank.height / 2 - 20, Number(health), 5);
+        ctx.fillStyle = "#FF0000";
+        ctx.fillRect(x - tank.width + Number(health), y - tank.height / 2 - 20, 100 - Number(health), 5);
+        ctx.font = "14px Arial";
+        ctx.fillStyle = "#000000";
+        ctx.fillText(name, x - tank.width, y - tank.height / 2 - 25);
+        ctx.font = "8px Arial";
+        ctx.fillStyle = "#FF0000";
+        ctx.fillText(health, x - tank.width + name.length * 7, y - tank.height / 2 - 25);
+    }
+
+    function drawShot(x, y, degrees) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((degrees + 90 % 360) * Math.PI / 180);
+        ctx.drawImage(bullet, -bullet.width / 2, -bullet.width / 2);
+        ctx.restore();
+    }
+
+    canvas.width = document.documentElement.clientWidth;
+    canvas.height = document.documentElement.clientHeight;
+</script>
